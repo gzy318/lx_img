@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>零星图床 | 极速云端存储</title>
+    <link rel="icon" href="https://twbk.cn/wp-content/uploads/2025/12/tx.png" type="image/png">
+    
+    <!-- 核心依赖 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.umd.js"></script>
+    <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { colors: { primary: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' }, dark: { 800: '#1e293b', 900: '#0f172a' } } } }
+        }
+    </script>
+    <style>
+        body { font-family: sans-serif; }
+        [x-cloak] { display: none !important; }
+        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); }
+        .dark .glass { background: rgba(15, 23, 42, 0.9); }
+        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+        .settings-input { width: 100%; box-sizing: border-box; }
+    </style>
+</head>
+
+<body class="min-h-screen transition-colors duration-300 bg-slate-50 text-slate-800 dark:bg-dark-900 dark:text-slate-200"
+      x-data="appData()" :class="{ 'dark': isDark }">
+
+    <!-- 顶部公告 -->
+    <div x-show="announcement || isMaintenance" x-transition
+         class="text-white text-xs py-2.5 text-center font-medium tracking-wide transition-all px-4 shadow-md z-50 relative"
+         :class="isMaintenance ? 'bg-amber-600' : 'bg-primary-600'">
+        <div x-show="isMaintenance" class="flex items-center justify-center gap-2 font-bold text-sm">
+            <i class="fa-solid fa-triangle-exclamation"></i> <span>系统维护模式已开启，暂停游客上传</span>
+        </div>
+        <div x-show="!isMaintenance && announcement" class="flex items-center justify-center gap-2">
+            <i class="fa-solid fa-bullhorn animate-pulse"></i> <span x-html="announcement"></span>
+        </div>
+    </div>
+
+    <!-- 导航栏 -->
+    <nav class="sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800 glass shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
+            <div class="flex items-center gap-3 cursor-pointer group" @click="showAdmin = false">
+                <img src="https://twbk.cn/wp-content/uploads/2025/12/tx.png" class="w-9 h-9 rounded-lg shadow-sm group-hover:rotate-6 transition">
+                <div><h1 class="font-bold text-xl tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-purple-600">零星图床</h1></div>
+            </div>
+            <div class="flex items-center gap-3">
+                <button @click="showHistory = !showHistory" class="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition" title="本地历史"><i class="fa-solid fa-clock-rotate-left"></i></button>
+                <button @click="toggleTheme()" class="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition"><i class="fa-solid" :class="isDark ? 'fa-sun' : 'fa-moon'"></i></button>
+                <button x-show="token" @click="logout()" x-cloak class="text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-1.5 rounded-lg transition font-medium">退出</button>
+                <button @click="handleAdminClick()" class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all shadow-sm bg-white text-slate-700 border border-slate-200 hover:border-primary-500 hover:text-primary-600 dark:bg-dark-800 dark:text-slate-200 dark:border-slate-700">
+                    <i :class="showAdmin ? 'fa-solid fa-house' : 'fa-solid fa-user-gear'"></i>
+                    <span x-text="showAdmin ? '返回' : '管理'" class="hidden sm:inline"></span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 侧边历史栏 -->
+    <div class="fixed inset-y-0 right-0 z-50 w-80 bg-white dark:bg-dark-800 shadow-2xl transform transition-transform duration-300 border-l border-slate-200 dark:border-slate-700"
+         :class="showHistory ? 'translate-x-0' : 'translate-x-full'" x-cloak>
+        <div class="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+            <h3 class="font-bold"><i class="fa-solid fa-clock-rotate-left text-primary-500 mr-2"></i>本地历史</h3>
+            <button @click="showHistory = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="p-4 overflow-y-auto h-[calc(100vh-60px)] sidebar-scroll space-y-4">
+            <template x-for="h in localHistory" :key="h.url">
+                <div class="flex gap-3 group">
+                    <img :src="h.url" class="w-16 h-16 rounded object-cover border border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 cursor-pointer" @click="openLinkModal(h)">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs text-slate-500 truncate" x-text="h.filename"></div>
+                        <div class="text-[10px] text-slate-400 mt-1" x-text="formatDateShort(h.time)"></div>
+                        <button @click="copy(h.url)" class="text-xs text-primary-500 hover:underline mt-1">复制链接</button>
+                    </div>
+                </div>
+            </template>
+            <div x-show="localHistory.length === 0" class="text-center text-slate-400 py-10 text-sm">暂无本地记录</div>
+        </div>
+    </div>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-20" @click="showHistory = false">
+        
+        <!-- 登录 -->
+        <div x-show="modals.login" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm" x-cloak x-transition.opacity>
+            <div class="bg-white dark:bg-dark-800 rounded-2xl shadow-2xl w-full max-w-sm p-8 relative" @click.outside="modals.login = false"><div class="text-center"><h2 class="text-xl font-bold mb-2">站长验证</h2><input type="password" x-model="inputToken" @keyup.enter="login()" placeholder="Admin Token" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 outline-none focus:ring-2 focus:ring-primary-500 transition mb-4"><button @click="login()" class="w-full py-3 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold transition">验证</button></div></div>
+        </div>
+
+        <!-- 批量导出 -->
+        <div x-show="modals.batchExport" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm" x-cloak x-transition.opacity>
+            <div class="bg-white dark:bg-dark-800 rounded-2xl shadow-2xl w-full max-w-2xl p-6 relative" @click.outside="modals.batchExport = false"><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">批量导出 (<span x-text="selectedImages.length"></span>张)</h3><button @click="modals.batchExport = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button></div><textarea readonly class="w-full h-64 p-4 rounded-lg bg-slate-50 dark:bg-slate-700 font-mono text-xs border border-slate-200 dark:border-slate-600 outline-none resize-none" x-model="batchExportContent"></textarea><div class="mt-4 flex justify-end gap-3"><button @click="copy(batchExportContent)" class="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">复制全部</button></div></div>
+        </div>
+
+        <!-- 设置弹窗 -->
+        <div x-show="modals.settings" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm" x-cloak x-transition.opacity>
+            <div class="bg-white dark:bg-dark-800 rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[85vh] relative overflow-hidden" @click.outside="modals.settings = false">
+                <div class="flex justify-between items-center px-8 py-6 border-b border-slate-100 dark:border-slate-700 shrink-0 bg-white dark:bg-dark-800 z-10"><h3 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-sliders text-primary-500"></i> 系统设置</h3><button @click="modals.settings = false" class="text-slate-400 hover:text-slate-600 text-xl w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition"><i class="fa-solid fa-xmark"></i></button></div>
+                <div class="overflow-y-auto sidebar-scroll flex-1 p-8 space-y-8 bg-white dark:bg-dark-800">
+                    <div class="flex items-center justify-between p-5 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-600"><div><span class="font-bold text-slate-700 dark:text-slate-200 text-lg">维护模式</span><p class="text-sm text-slate-400 mt-1">开启后仅管理员可上传</p></div><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" x-model="settings.maintenance_mode" class="sr-only peer"><div class="w-12 h-7 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary-600"></div></label></div>
+                    <div><h4 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-l-4 border-primary-500 pl-3">资源限制</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div><label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">每日上传数量 (张)</label><input type="number" x-model="settings.limit_count" class="settings-input w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 outline-none focus:ring-2 focus:ring-primary-500 transition shadow-sm"><p class="text-xs text-slate-400 mt-1.5 ml-1">0 表示不限制</p></div><div><label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">每日上传流量 (MB)</label><input type="number" x-model="settings.limit_size" class="settings-input w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 outline-none focus:ring-2 focus:ring-primary-500 transition shadow-sm"><p class="text-xs text-slate-400 mt-1.5 ml-1">0 表示不限制</p></div></div></div>
+                    <div><h4 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-l-4 border-orange-500 pl-3">高级控制</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div><label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">强制压缩阈值 (MB)</label><input type="number" x-model="settings.compress_limit" class="settings-input w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 outline-none focus:ring-2 focus:ring-primary-500 transition shadow-sm"><p class="text-xs text-slate-400 mt-1.5 ml-1">超过此大小自动压缩 (0 为不限制)</p></div><div><label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">防盗链白名单</label><input type="text" x-model="settings.allowed_referers" class="settings-input w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 outline-none focus:ring-2 focus:ring-primary-500 transition shadow-sm"><p class="text-xs text-slate-400 mt-1.5 ml-1">逗号分隔，留空允许所有</p></div></div></div>
+                    <div><h4 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-l-4 border-blue-500 pl-3">全站公告</h4><textarea x-model="settings.announcement" class="settings-input w-full px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 outline-none focus:ring-2 focus:ring-primary-500 h-28 text-sm resize-y shadow-sm"></textarea></div>
+                    <div class="grid grid-cols-2 gap-4 pt-2"><button @click="downloadShareXConfig()" class="py-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition text-sm font-bold flex items-center justify-center"><i class="fa-solid fa-download mr-2"></i> ShareX 配置</button><button @click="purgeExpired()" class="py-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition text-sm font-bold flex items-center justify-center"><i class="fa-solid fa-trash-clock mr-2"></i> 清理过期图片</button></div>
+                </div>
+                <div class="p-6 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 shrink-0"><button @click="saveSettings()" class="w-full py-3.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 transition font-bold shadow-lg shadow-primary-500/30 text-lg">保存所有更改</button></div>
+            </div>
+        </div>
+
+        <!-- 链接详情 -->
+        <div x-show="modals.link" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm" x-cloak x-transition.opacity>
+            <div class="bg-white dark:bg-dark-800 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]" @click.outside="modals.link = false">
+                <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                    <div class="flex gap-6 text-sm font-bold text-slate-500">
+                        <button @click="detailTab = 'links'" :class="detailTab === 'links' ? 'text-primary-600 border-b-2 border-primary-600' : 'hover:text-slate-700'" class="pb-2 transition">链接分享</button>
+                        <button @click="detailTab = 'tools'; analyzeImage()" :class="detailTab === 'tools' ? 'text-primary-600 border-b-2 border-primary-600' : 'hover:text-slate-700'" class="pb-2 transition">AI 工具箱</button>
+                    </div>
+                    <button @click="modals.link = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                <div x-show="detailTab === 'links'" class="p-6 overflow-y-auto flex flex-col md:flex-row gap-6">
+                    <div class="w-full md:w-1/3 flex flex-col items-center gap-4"><div class="bg-slate-100 dark:bg-slate-700 p-2 rounded-lg w-full flex items-center justify-center min-h-[200px] relative"><img :src="activeImg.url" class="max-h-60 rounded shadow-sm object-contain cursor-zoom-in" @click="openLightbox(activeImg.url)" crossorigin="anonymous" id="detailImage"></div><div id="qrcode" class="bg-white p-2 rounded shadow-sm"></div><div x-show="activeImg.expire_at" class="text-xs text-red-500 bg-red-50 px-3 py-1.5 rounded-full font-bold shadow-sm"><i class="fa-solid fa-hourglass-half mr-1"></i> <span x-text="formatDate(activeImg.expire_at)"></span></div></div>
+                    <div class="w-full md:w-2/3 space-y-4"><template x-for="(item, index) in getLinkFormats(activeImg)" :key="index"><div><label class="text-xs font-bold text-slate-400 uppercase mb-1 block" x-text="item.label"></label><div class="flex items-center border border-slate-200 dark:border-slate-600 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-primary-500"><input type="text" :value="item.value" readonly class="w-full bg-slate-50 dark:bg-slate-900 px-3 py-2 text-sm outline-none font-mono text-slate-600 dark:text-slate-300"><button @click="copy(item.value)" class="px-4 py-2 bg-white dark:bg-slate-800 border-l border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500"><i class="fa-regular fa-copy"></i></button></div></div></template></div>
+                </div>
+                <div x-show="detailTab === 'tools'" class="p-6 overflow-y-auto"><div class="grid grid-cols-1 md:grid-cols-2 gap-8"><div><h4 class="font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-palette text-purple-500"></i> 色彩分析</h4><div class="flex flex-wrap gap-3" id="colorPalette"><template x-for="color in imageColors" :key="color"><div @click="copy(color)" class="w-14 h-14 rounded-lg shadow-sm cursor-pointer hover:scale-110 transition flex items-center justify-center group" :style="`background-color: ${color}`"><span class="text-[10px] text-white/90 font-mono bg-black/40 px-1 rounded opacity-0 group-hover:opacity-100 transition" x-text="color"></span></div></template><div x-show="imageColors.length === 0" class="text-sm text-slate-400">加载中...</div></div></div><div><h4 class="font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-font text-blue-500"></i> OCR 识别</h4><div class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 min-h-[150px] relative"><p class="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap font-mono" x-text="ocrResult || '点击下方按钮开始识别...'"></p><div x-show="isOcring" class="absolute inset-0 bg-white/80 dark:bg-dark-900/80 flex items-center justify-center text-primary-600 font-bold backdrop-blur-sm rounded-xl"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> 分析中...</div></div><button @click="runOCR()" class="mt-3 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm w-full"><i class="fa-solid fa-robot mr-1"></i> 开始识别</button></div></div></div>
+            </div>
+        </div>
+
+        <!-- 灯箱 -->
+        <div x-show="lightbox.show" class="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center" x-cloak x-transition.opacity @click="lightbox.show = false"><button class="absolute top-5 right-5 text-white/70 hover:text-white text-3xl"><i class="fa-solid fa-xmark"></i></button><img :src="lightbox.url" class="max-w-[95vw] max-h-[95vh] rounded-lg shadow-2xl transform transition cursor-zoom-out" @click.stop></div>
+
+        <!-- ==================== 首页 ==================== -->
+        <div x-show="!showAdmin" x-transition.opacity.duration.300ms>
+            <div class="text-center mb-10 mt-6"><h1 class="text-4xl md:text-5xl font-extrabold mb-4 tracking-tight"><span class="bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-purple-600">无限创意</span>，云端安放</h1><p class="text-slate-500 dark:text-slate-400 text-lg max-w-2xl mx-auto">秒传 · AI 识别 · <span class="text-primary-500 font-bold">智能处理</span></p></div>
+            <div class="max-w-3xl mx-auto">
+                <div class="bg-white dark:bg-dark-800 rounded-3xl shadow-xl border-2 border-dashed border-primary-100 dark:border-slate-700 hover:border-primary-400 dark:hover:border-primary-500 transition-all p-10 relative group overflow-hidden" @dragover.prevent="isDragging = true" @dragleave.prevent="isDragging = false" @drop.prevent="handleDrop($event)">
+                    <div x-show="isDragging" class="absolute inset-0 bg-primary-50/95 dark:bg-slate-800/95 z-20 flex flex-col items-center justify-center text-primary-600" x-transition><i class="fa-solid fa-cloud-arrow-up text-5xl mb-4 animate-bounce"></i><p class="text-xl font-bold">释放即刻上传</p></div>
+                    <div class="text-center cursor-pointer" onclick="document.getElementById('fileInput').click()"><div class="w-20 h-20 mx-auto bg-primary-50 dark:bg-slate-700 rounded-full flex items-center justify-center text-primary-500 mb-6 group-hover:scale-110 transition duration-300"><i class="fa-solid fa-images text-3xl"></i></div><h2 class="text-2xl font-bold mb-2">点击或拖拽图片到这里</h2><p class="text-slate-400 text-sm mb-6">最大 20MB · 支持批量 · 自动优化</p><button class="px-8 py-3 bg-primary-600 text-white rounded-full font-bold shadow-lg shadow-primary-500/30 hover:bg-primary-700 hover:-translate-y-1 transition">选择文件</button><input type="file" id="fileInput" class="hidden" multiple @change="handleFiles($event.target.files)" accept="image/*"></div>
+                </div>
+                <!-- 选项栏 -->
+                <div class="mt-4 flex flex-wrap justify-center gap-3 text-sm text-slate-500">
+                    <!-- 水印输入框 -->
+                    <div class="flex items-center gap-2 bg-white dark:bg-dark-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:border-primary-400 transition" title="输入文字自动打水印">
+                        <i class="fa-solid fa-copyright text-blue-500"></i>
+                        <input type="text" x-model="watermarkText" placeholder="水印文字 (可选)" class="bg-transparent outline-none w-28 text-slate-600 dark:text-slate-300 text-xs">
+                    </div>
+                    <!-- 压缩/WebP -->
+                    <label class="flex items-center gap-2 cursor-pointer bg-white dark:bg-dark-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:border-primary-400 transition" title="压缩图片 (保持原格式)"><input type="checkbox" x-model="compress" class="accent-primary-600 w-4 h-4"><span><i class="fa-solid fa-compress text-primary-500 mr-1"></i> 压缩图片</span></label>
+                    <label class="flex items-center gap-2 cursor-pointer bg-white dark:bg-dark-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:border-primary-400 transition" title="转换为 WebP 格式 (体积更小)"><input type="checkbox" x-model="convertWebp" class="accent-primary-600 w-4 h-4"><span><i class="fa-solid fa-file-image text-purple-500 mr-1"></i> 转 WebP</span></label>
+                    <div class="flex items-center gap-2 bg-white dark:bg-dark-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:border-primary-400 transition"><i class="fa-regular fa-clock text-orange-500"></i><select x-model="expireTime" class="bg-transparent outline-none cursor-pointer text-slate-600 dark:text-slate-300"><option value="0">永久保存</option><option value="1">1小时</option><option value="24">24小时</option></select></div>
+                </div>
+                <!-- 队列 -->
+                <div x-show="uploadQueue.length > 0" class="mt-8 space-y-4">
+                    <div class="flex items-center justify-between"><h3 class="font-bold text-lg">上传队列</h3><button @click="uploadQueue = []" class="text-xs text-red-500 hover:underline">清空</button></div>
+                    <template x-for="(item, index) in uploadQueue" :key="index">
+                        <div class="bg-white dark:bg-dark-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 flex items-center gap-4 transition-all" :class="{'border-l-4 border-l-green-500': item.status === 'success', 'border-l-4 border-l-red-500': item.status === 'error'}">
+                            <div class="w-12 h-12 bg-slate-50 dark:bg-slate-700 rounded-lg flex-shrink-0 flex items-center justify-center"><i x-show="item.status === 'processing'" class="fa-solid fa-wand-magic-sparkles fa-spin text-purple-500"></i><i x-show="item.status === 'uploading'" class="fa-solid fa-circle-notch fa-spin text-primary-500"></i><i x-show="item.status === 'success'" class="fa-solid fa-check text-green-500"></i><i x-show="item.status === 'error'" class="fa-solid fa-ban text-red-500"></i></div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex justify-between items-center mb-1"><p class="text-sm font-medium truncate" x-text="item.file.name"></p><span class="text-xs text-slate-400" x-text="formatSize(item.file.size)"></span></div>
+                                <div x-show="item.status === 'success'" class="flex gap-2 mt-2 items-center"><button @click="openLinkModal(item.data)" class="text-xs bg-primary-50 dark:bg-primary-900/30 text-primary-600 px-2 py-1 rounded hover:bg-primary-100 transition"><i class="fa-solid fa-link"></i> 链接</button><a :href="item.data?.url" target="_blank" class="text-xs bg-slate-50 dark:bg-slate-700 text-slate-500 px-2 py-1 rounded hover:bg-slate-100 transition"><i class="fa-solid fa-eye"></i> 预览</a><span x-show="item.data.deduplicated" class="text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded font-bold ml-1 border border-green-200"><i class="fa-solid fa-bolt"></i> 秒传</span></div>
+                                <div x-show="item.status === 'error'" class="text-xs text-red-500 mt-1" x-text="item.error"></div><div x-show="item.status === 'processing'" class="text-xs text-purple-500 mt-1" x-text="item.processMsg"></div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            <div class="max-w-5xl mx-auto mt-16 border-t border-slate-200 dark:border-slate-800 pt-8">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center"><div><div class="text-3xl font-bold text-slate-800 dark:text-white" x-text="stats.total.count"></div><div class="text-xs text-slate-400 mt-1">总托管图片</div></div><div><div class="text-3xl font-bold text-slate-800 dark:text-white" x-text="formatSize(stats.total.size)"></div><div class="text-xs text-slate-400 mt-1">总存储容量</div></div><div><div class="text-3xl font-bold text-slate-800 dark:text-white" x-text="stats.today.count"></div><div class="text-xs text-slate-400 mt-1">今日上传</div></div><div><div class="text-3xl font-bold text-slate-800 dark:text-white" x-text="formatSize(stats.today.size)"></div><div class="text-xs text-slate-400 mt-1">今日流量</div></div></div>
+            </div>
+        </div>
+
+        <!-- 后台管理 -->
+        <div x-show="showAdmin" x-cloak class="min-h-[80vh]">
+            <div class="bg-white dark:bg-dark-800 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden min-h-[600px] flex flex-col">
+                <div class="p-6 border-b border-slate-100 dark:border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div class="flex items-center gap-4 w-full md:w-auto"><h2 class="font-bold text-xl flex items-center gap-2"><i class="fa-solid fa-database text-primary-500"></i> 管理后台</h2><button @click="openSettings()" class="bg-slate-100 dark:bg-slate-700 hover:bg-primary-100 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-lg text-sm transition"><i class="fa-solid fa-sliders mr-1"></i> 设置</button></div>
+                    <div class="flex p-1 bg-slate-100 dark:bg-slate-700 rounded-lg"><button @click="adminTab = 'images'" :class="adminTab === 'images' ? 'bg-white dark:bg-slate-600 shadow text-slate-800 dark:text-white' : 'text-slate-500'" class="px-4 py-1.5 rounded-md text-sm font-medium transition">图片</button><button @click="adminTab = 'ips'; fetchBlockedIps()" :class="adminTab === 'ips' ? 'bg-white dark:bg-slate-600 shadow text-slate-800 dark:text-white' : 'text-slate-500'" class="px-4 py-1.5 rounded-md text-sm font-medium transition">黑名单</button></div>
+                </div>
+                <div x-show="adminTab === 'images'" class="flex-1 flex flex-col">
+                    <div class="p-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
+                        <div class="text-sm text-slate-500" x-show="selectedImages.length > 0">已选 <span x-text="selectedImages.length" class="font-bold text-primary-600"></span> 张</div><div class="text-sm text-slate-500" x-show="selectedImages.length === 0">支持批量操作</div><div class="relative w-64"><i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i><input type="text" x-model="searchQuery" placeholder="搜索文件名/IP..." class="w-full pl-9 pr-12 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm outline-none"><button @click="fetchImages()" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary-500"><i class="fa-solid fa-rotate-right"></i></button></div>
+                    </div>
+                    <div class="overflow-x-auto flex-1"><table class="w-full text-left"><thead class="bg-slate-50 dark:bg-slate-700/50 text-xs uppercase text-slate-400 font-semibold select-none"><tr><th class="px-6 py-4 w-10"><input type="checkbox" @change="toggleAll($event)" class="rounded border-slate-300"></th><th class="px-6 py-4">预览</th><th class="px-6 py-4 cursor-pointer hover:text-primary-500" @click="sortBy('filename')">文件名 <i class="fa-solid fa-sort ml-1"></i></th><th class="px-6 py-4 cursor-pointer hover:text-primary-500" @click="sortBy('size')">大小 <i class="fa-solid fa-sort ml-1"></i></th><th class="px-6 py-4 cursor-pointer hover:text-primary-500" @click="sortBy('created_at')">时间 <i class="fa-solid fa-sort ml-1"></i></th><th class="px-6 py-4 text-right">操作</th></tr></thead><tbody class="divide-y divide-slate-100 dark:divide-slate-700"><template x-for="img in sortedImages" :key="img.id"><tr class="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition group" :class="selectedImages.includes(img.id) ? 'bg-primary-50 dark:bg-primary-900/10' : ''"><td class="px-6 py-3"><input type="checkbox" :value="img.id" x-model="selectedImages" class="rounded border-slate-300"></td><td class="px-6 py-3 w-20"><div class="w-14 h-14 bg-slate-100 dark:bg-slate-700 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-600 cursor-zoom-in" @click="openLightbox(img.url)"><img :src="img.url" loading="lazy" class="w-full h-full object-cover"></div></td><td class="px-6 py-3"><div class="text-sm font-medium text-slate-800 dark:text-slate-200 truncate max-w-[200px]" x-text="img.filename"></div><div class="text-xs text-slate-400 mt-1 font-mono flex gap-2 items-center"><span x-text="img.ip || 'Unknown'"></span><button @click="blockIP(img.ip)" class="text-red-400 hover:text-red-600 hover:underline" title="封禁IP">[封]</button></div></td><td class="px-6 py-3 text-xs text-slate-500" x-text="formatSize(img.size)"></td><td class="px-6 py-3"><div class="text-xs text-slate-400" x-text="formatDateShort(img.created_at)"></div><div x-show="img.expire_at" class="mt-1 text-red-500 font-bold text-[10px] flex items-center" :title="'销毁时间: ' + formatDate(img.expire_at)"><i class="fa-solid fa-hourglass-start mr-1"></i>临时</div></td><td class="px-6 py-3 text-right"><button @click="openLinkModal(img)" class="text-slate-400 hover:text-primary-500 p-2 transition"><i class="fa-solid fa-link"></i></button><button @click="deleteImage(img.id)" class="text-slate-400 hover:text-red-500 p-2 transition"><i class="fa-solid fa-trash-can"></i></button></td></tr></template></tbody></table></div>
+                    <div x-show="selectedImages.length > 0" x-transition class="p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center shadow-[0_-5px_15px_rgba(0,0,0,0.05)] sticky bottom-0 z-10"><span class="text-sm font-bold">已选 <span x-text="selectedImages.length"></span> 项</span><div class="flex gap-3"><button @click="openBatchExport()" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded text-sm transition"><i class="fa-solid fa-share-from-square mr-1"></i> 导出链接</button><button @click="batchDelete()" class="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded text-sm transition font-medium"><i class="fa-solid fa-trash mr-1"></i> 批量删除</button></div></div>
+                </div>
+                <div x-show="adminTab === 'ips'" class="flex-1 flex flex-col"><div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50"><div class="flex justify-between items-center"><div class="text-sm text-slate-500">黑名单列表 (禁止上传)</div><button @click="fetchBlockedIps()" class="text-slate-400 hover:text-primary-500"><i class="fa-solid fa-rotate-right"></i></button></div></div><div class="overflow-x-auto"><table class="w-full text-left"><thead class="bg-slate-50 dark:bg-slate-700/50 text-xs uppercase text-slate-400 font-semibold"><tr><th class="px-6 py-4">IP 地址</th><th class="px-6 py-4">封禁时间</th><th class="px-6 py-4 text-right">操作</th></tr></thead><tbody class="divide-y divide-slate-100 dark:divide-slate-700"><template x-for="item in blockedIps" :key="item.ip"><tr class="hover:bg-slate-50 dark:hover:bg-slate-700/30"><td class="px-6 py-4 font-mono text-sm" x-text="item.ip"></td><td class="px-6 py-4 text-sm text-slate-500" x-text="formatDate(item.created_at)"></td><td class="px-6 py-4 text-right"><button @click="unblockIP(item.ip)" class="text-sm bg-green-50 text-green-600 px-3 py-1 rounded hover:bg-green-100 transition">解封</button></td></tr></template></tbody></table><div x-show="blockedIps.length === 0" class="text-center py-20 text-slate-400"><p>暂无封禁记录</p></div></div></div>
+            </div>
+        </div>
+    </main>
+
+    <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[70] flex flex-col gap-2"><template x-for="t in toasts" :key="t.id"><div x-show="t.show" x-transition.slide.up class="px-4 py-3 rounded-lg shadow-xl text-sm font-medium flex items-center gap-2 min-w-[300px]" :class="t.type === 'error' ? 'bg-red-500 text-white' : 'bg-slate-800 text-white'"><i :class="t.type === 'error' ? 'fa-solid fa-circle-exclamation' : 'fa-solid fa-circle-check'"></i><span x-text="t.message"></span></div></template></div>
+
+    <script>
+        const API_BASE = 'https://img-backend.gzy318.workers.dev'; 
+
+        function appData() {
+            return {
+                isDark: localStorage.getItem('theme') === 'dark', token: localStorage.getItem('img_token') || '', inputToken: '',
+                showAdmin: false, showHistory: false, isDragging: false, searchQuery: '',
+                adminTab: 'images', detailTab: 'links',
+                // 功能开关
+                compress: false, convertWebp: false, watermarkText: '', expireTime: "0", imgFilter: '',
+                // 数据
+                modals: { login: false, link: false, settings: false, batchExport: false },
+                lightbox: { show: false, url: '' },
+                stats: { total: { count: 0, size: 0 }, today: { count: 0, size: 0 } },
+                announcement: '', isMaintenance: false,
+                settings: { limit_count: 50, limit_size: 50, compress_limit: 2, allowed_referers: '', announcement: '', maintenance_mode: false },
+                uploadQueue: [], imageList: [], blockedIps: [], selectedImages: [], localHistory: JSON.parse(localStorage.getItem('img_history') || '[]'), activeImg: {}, batchExportContent: '', toasts: [],
+                sortCol: 'created_at', sortAsc: false,
+                imageColors: [], ocrResult: '', isOcring: false,
+
+                init() {
+                    if (this.isDark) document.documentElement.classList.add('dark');
+                    this.$watch('isDark', val => { localStorage.setItem('theme', val ? 'dark' : 'light'); if (val) document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark'); });
+                    this.fetchStats();
+                    window.addEventListener('paste', e => { if(this.showAdmin || this.modals.login || this.modals.link || this.modals.settings) return; const items = (e.clipboardData || e.originalEvent.clipboardData).items; const files = []; for (let item of items) { if (item.kind === 'file') files.push(item.getAsFile()); } if(files.length > 0) this.handleFiles(files); });
+                },
+                toggleTheme() { this.isDark = !this.isDark; },
+                async fetchStats() { try { const res = await fetch(`${API_BASE}/api/stats`); if(res.ok) { const d = await res.json(); this.stats = d; this.announcement = d.announcement; this.isMaintenance = d.maintenance; if(d.limits) { this.settings.compress_limit = d.limits.compress; } } } catch(e) {} },
+
+                // ================= 核心处理流水线 (修复版) =================
+                async handleFiles(files) {
+                    if (!files || files.length === 0) return; this.isDragging = false;
+                    const limitBytes = (this.settings.compress_limit || 2) * 1024 * 1024;
+                    
+                    for(let file of Array.from(files)) {
+                        if (!file.type.startsWith('image/')) { this.notify('忽略非图片文件', 'error'); continue; }
+                        
+                        const rawItem = { file: file, status: 'pending', error: '', data: null, processMsg: '' };
+                        this.uploadQueue.unshift(rawItem);
+                        const reactiveItem = this.uploadQueue[0];
+                        
+                        let fileToUpload = file;
+                        let fileName = file.name; // 保持原始文件名引用
+
+                        try {
+                            // 1. 水印处理 (Canvas 返回 Blob)
+                            if(this.watermarkText) {
+                                reactiveItem.status = 'processing'; reactiveItem.processMsg = '添加水印中...';
+                                fileToUpload = await this.addWatermark(fileToUpload, this.watermarkText);
+                            }
+
+                            // 2. 逻辑分支：转WebP vs 普通压缩
+                            const needCompress = this.compress || (limitBytes > 0 && file.size > limitBytes);
+                            
+                            if (this.convertWebp) {
+                                reactiveItem.status = 'processing'; reactiveItem.processMsg = '转 WebP 中...';
+                                // 强制转为 webp
+                                fileToUpload = await imageCompression(fileToUpload, { 
+                                    maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true,
+                                    fileType: 'image/webp' 
+                                });
+                                // 修改文件名后缀
+                                fileName = fileName.replace(/\.[^/.]+$/, "") + ".webp";
+                            } 
+                            else if (needCompress) {
+                                if(!this.compress) this.notify('文件较大 (>'+this.settings.compress_limit+'MB)，自动压缩中...', 'error');
+                                reactiveItem.status = 'processing'; reactiveItem.processMsg = '智能压缩中...';
+                                // 普通压缩，保持原格式
+                                fileToUpload = await imageCompression(fileToUpload, { 
+                                    maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true 
+                                });
+                            }
+
+                            // 3. 上传 (关键：显式传递 fileName)
+                            await this.processQueue(reactiveItem, fileToUpload, fileName);
+
+                        } catch(e) {
+                            reactiveItem.status = 'error'; reactiveItem.error = e.message; console.error(e);
+                        }
+                    }
+                },
+
+                // Canvas 水印 (保持)
+                addWatermark(file, text) {
+                    return new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.readAsDataURL(file);
+                        reader.onload = (e) => {
+                            const img = new Image(); img.src = e.target.result;
+                            img.onload = () => {
+                                const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+                                canvas.width = img.width; canvas.height = img.height;
+                                ctx.drawImage(img, 0, 0);
+                                const fontSize = Math.max(24, canvas.width / 25);
+                                ctx.font = `bold ${fontSize}px sans-serif`; ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                                ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+                                ctx.shadowColor = "rgba(0, 0, 0, 0.5)"; ctx.shadowBlur = 4;
+                                ctx.fillText(text, canvas.width - 20, canvas.height - 20);
+                                // 输出 Blob，默认 png 保证质量，后续会被压缩流程处理
+                                canvas.toBlob((blob) => { resolve(new File([blob], file.name, { type: file.type })); }, file.type, 0.9);
+                            };
+                        };
+                    });
+                },
+
+                async processQueue(item, file, fileName) {
+                    item.status = 'uploading'; 
+                    const formData = new FormData(); 
+                    // [修复核心] 显式传递 fileName，防止后端识别为 'blob'
+                    formData.append('file', file, fileName); 
+                    if(this.expireTime !== "0") formData.append('expire', this.expireTime);
+                    const headers = {}; if(this.token) { headers['Authorization'] = `Bearer ${this.token}`; }
+                    
+                    try { 
+                        const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', headers: headers, body: formData }); 
+                        const data = await res.json(); 
+                        if (res.ok) { 
+                            item.status = 'success'; item.data = data; this.fetchStats(); 
+                            const historyItem = { url: data.url, filename: data.filename, time: Date.now() }; 
+                            this.localHistory.unshift(historyItem); if(this.localHistory.length > 20) this.localHistory.pop(); 
+                            localStorage.setItem('img_history', JSON.stringify(this.localHistory)); 
+                            if(this.uploadQueue.length === 1) this.openLinkModal(data); 
+                        } else throw new Error(data.error || '失败'); 
+                    } catch (e) { item.status = 'error'; item.error = e.message; }
+                },
+
+                // AI
+                analyzeImage() {
+                    this.imageColors=[]; this.ocrResult=''; const img = document.getElementById('detailImage'); if(!img) return;
+                    try { const ct = new ColorThief(); if(img.complete) this.extColor(ct,img); else img.onload=()=>this.extColor(ct,img); } catch(e){}
+                },
+                extColor(ct, img) { const c = ct.getPalette(img, 5); this.imageColors = c.map(x => "#"+((1<<24)+(x[0]<<16)+(x[1]<<8)+x[2]).toString(16).slice(1).toUpperCase()); },
+                async runOCR() { 
+                    if(!this.activeImg.url) return; this.isOcring=true;
+                    try { const { data: { text } } = await Tesseract.recognize(this.activeImg.url, 'eng+chi_sim'); this.ocrResult = text; } catch(e) { this.ocrResult='识别失败'; } finally { this.isOcring=false; }
+                },
+
+                // 管理逻辑
+                sortBy(col) { if(this.sortCol === col) this.sortAsc = !this.sortAsc; else { this.sortCol = col; this.sortAsc = true; } },
+                get sortedImages() { let list = this.filteredImages; return list.sort((a, b) => { let valA = a[this.sortCol], valB = b[this.sortCol]; if (typeof valA === 'string') valA = valA.toLowerCase(); if (typeof valB === 'string') valB = valB.toLowerCase(); if (valA < valB) return this.sortAsc ? -1 : 1; if (valA > valB) return this.sortAsc ? 1 : -1; return 0; }); },
+                get filteredImages() { if (!this.searchQuery) return this.imageList; const q = this.searchQuery.toLowerCase(); return this.imageList.filter(img => (img.filename&&img.filename.toLowerCase().includes(q)) || (img.ip&&img.ip.includes(q))); },
+                toggleAll(e) { if(e.target.checked) this.selectedImages = this.filteredImages.map(img => img.id); else this.selectedImages = []; },
+                async batchDelete() { if(this.selectedImages.length === 0) return; if(!confirm(`确定删除 ${this.selectedImages.length} 张图片?`)) return; try { const res = await fetch(`${API_BASE}/api/admin/batch_delete`, { method: 'POST', headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: this.selectedImages }) }); if(res.ok) { this.notify('批量删除成功'); this.selectedImages = []; this.fetchImages(); } } catch(e) {} },
+                openBatchExport() { const links = this.imageList.filter(img => this.selectedImages.includes(img.id)).map(img => `![${img.filename}](${img.url})`).join('\n'); this.batchExportContent = links; this.modals.batchExport = true; },
+                async purgeExpired() { if(!confirm('确定立即清理所有已过期的图片吗？\n这将释放存储空间。')) return; try { const res = await fetch(`${API_BASE}/api/admin/purge_expired`, { method: 'POST', headers: { 'Authorization': `Bearer ${this.token}` } }); const data = await res.json(); if(res.ok) { this.notify(`成功清理 ${data.count} 张过期图片`); this.fetchImages(); } } catch(e) { this.notify('清理失败', 'error'); } },
+                async fetchBlockedIps() { try { const res = await fetch(`${API_BASE}/api/admin/blocked_ips`, { headers: { 'Authorization': `Bearer ${this.token}` } }); if(res.ok) this.blockedIps = await res.json(); } catch(e) {} },
+                async blockIP(ip) { if(!ip || !confirm(`封禁 IP: ${ip} ?`)) return; try { const res = await fetch(`${API_BASE}/api/admin/block_ip`, { method: 'POST', headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ip }) }); if(res.ok) { this.notify('IP 已封禁'); if(this.adminTab === 'ips') this.fetchBlockedIps(); } } catch(e) {} },
+                async unblockIP(ip) { if(!confirm(`解封 IP: ${ip} ?`)) return; try { const res = await fetch(`${API_BASE}/api/admin/unblock_ip`, { method: 'POST', headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ip }) }); if(res.ok) { this.notify('IP 已解封'); this.fetchBlockedIps(); } } catch(e) {} },
+                async openSettings() { try { const res = await fetch(`${API_BASE}/api/admin/settings`, { headers: { 'Authorization': `Bearer ${this.token}` } }); if (res.ok) { const data = await res.json(); this.settings = { limit_count: parseInt(data.limit_count||50), limit_size: parseInt(data.limit_size||50), compress_limit: parseInt(data.compress_limit||2), allowed_referers: data.allowed_referers||'', announcement: data.announcement||'', maintenance_mode: data.maintenance_mode === 'true' }; this.modals.settings = true; } } catch(e) {} },
+                async saveSettings() { try { const res = await fetch(`${API_BASE}/api/admin/settings`, { method: 'POST', headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(this.settings) }); if (res.ok) { this.notify('设置已保存'); this.modals.settings = false; this.fetchStats(); } } catch(e) {} },
+                downloadShareXConfig() { const config = { "Version": "15.0.0", "Name": "ZeroStarHost", "DestinationType": "ImageUploader", "RequestMethod": "POST", "RequestURL": `${API_BASE}/api/upload`, "Body": "MultipartFormData", "FileFormName": "file", "URL": "{json:url}", "Headers": { "Authorization": `Bearer ${this.token || "YOUR_TOKEN_HERE"}` } }; const blob = new Blob([JSON.stringify(config, null, 2)], {type: "application/json"}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = "ZeroStarHost.sxcu"; document.body.appendChild(a); a.click(); document.body.removeChild(a); },
+                handleAdminClick() { if (this.showAdmin) { this.showAdmin = false; } else if (this.token) { this.showAdmin = true; this.fetchImages(); } else { this.modals.login = true; } },
+                login() { if(!this.inputToken) return; this.token = this.inputToken; localStorage.setItem('img_token', this.inputToken); this.modals.login = false; this.showAdmin = true; this.inputToken = ''; this.fetchImages(); },
+                logout() { this.token = ''; localStorage.removeItem('img_token'); this.showAdmin = false; this.notify('已退出'); },
+                openLinkModal(img) { this.activeImg = img; this.modals.link = true; this.detailTab = 'links'; this.imgFilter = ''; this.$nextTick(() => { const c = document.getElementById('qrcode'); c.innerHTML=''; new QRCode(c, { text: img.url, width: 128, height: 128 }); }); },
+                openLightbox(url) { this.lightbox.url = url; this.lightbox.show = true; },
+                getLinkFormats(img) { if(!img || !img.url) return []; return [ { label: 'URL', value: img.url }, { label: 'Markdown', value: `![${img.filename}](${img.url})` }, { label: 'HTML', value: `<img src="${img.url}" alt="${img.filename}" />` }, { label: 'BBCode', value: `[img]${img.url}[/img]` } ]; },
+                async copy(text) { try { await navigator.clipboard.writeText(text); this.notify('已复制'); } catch(e) {} },
+                async fetchImages() { try { const res = await fetch(`${API_BASE}/api/admin/list`, { headers: { 'Authorization': `Bearer ${this.token}` } }); if(res.ok) this.imageList = await res.json(); else if(res.status===401) { this.logout(); } } catch(e) {} },
+                async deleteImage(id) { if(!confirm('确定永久删除?')) return; try { const res = await fetch(`${API_BASE}/api/admin/delete/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${this.token}` } }); if(res.ok) { this.notify('已删除'); this.imageList = this.imageList.filter(img => img.id !== id); this.fetchStats(); } } catch(e) {} },
+                formatSize(bytes) { if(!bytes) return '0 B'; const k=1024; const i=Math.floor(Math.log(bytes)/Math.log(k)); return parseFloat((bytes/Math.pow(k,i)).toFixed(2))+' '+['B','KB','MB','GB'][i]; },
+                formatDate(ts) { return new Date(ts).toLocaleString(); }, formatDateShort(ts) { return new Date(ts).toLocaleDateString(); },
+                notify(msg, type = 'success') { const id = Date.now(); this.toasts.push({ id, message: msg, type, show: true }); setTimeout(() => { this.toasts = this.toasts.filter(t => t.id !== id); }, 3000); }
+            }
+        }
+    </script>
+</body>
+</html>
