@@ -1,15 +1,16 @@
-# ☁️ Zero Star Host (零星图床)
+# ☁️ LX IMG (零星图床)
 
 [![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-orange?logo=cloudflare)](https://workers.cloudflare.com/)
 [![Cloudflare R2](https://img.shields.io/badge/Cloudflare-R2-yellow?logo=cloudflare)](https://www.cloudflare.com/products/r2/)
 [![Cloudflare D1](https://img.shields.io/badge/Cloudflare-D1-blue?logo=cloudflare)](https://www.cloudflare.com/developer-platform/d1/)
-[![License](https://img.shields.io/github/license/gzy318/img)](https://github.com/gzy318/img/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/gzy318/lx_img)](https://github.com/gzy318/lx_img/blob/main/LICENSE)
 
 **Zero Star Host (零星图床)** 是一个基于 Cloudflare 全家桶（Workers + Pages + R2 + D1）构建的现代化、Serverless 极速图床。
 
 它不仅仅是一个图片存储工具，更集成了 **AI 辅助功能**、**隐私保护**、**极速秒传**以及**强大的后台管理**系统。无需服务器，免费额度足够个人及小型团队使用。
 
-🔗 **项目仓库**: [https://github.com/gzy318/img](https://github.com/gzy318/img)
+🔗 **项目仓库**: [https://github.com/gzy318/lx_img](https://github.com/gzy318/lx_img)
+🔗 **演示网站**: [https://img.gzy.wang]((https://img.gzy.wang/))
 
 ---
 
