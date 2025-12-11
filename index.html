@@ -165,8 +165,9 @@
                         <i class="fa-solid fa-copyright text-blue-500"></i>
                         <input type="text" x-model="watermarkText" placeholder="水印文字 (可选)" class="bg-transparent outline-none w-28 text-slate-600 dark:text-slate-300 text-xs">
                     </div>
-                    <label class="flex items-center gap-2 cursor-pointer bg-white dark:bg-dark-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:border-primary-400 transition" title="压缩图片"><input type="checkbox" x-model="compress" class="accent-primary-600 w-4 h-4"><span><i class="fa-solid fa-compress text-primary-500 mr-1"></i> 压缩</span></label>
-                    <label class="flex items-center gap-2 cursor-pointer bg-white dark:bg-dark-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:border-primary-400 transition" title="转 WebP"><input type="checkbox" x-model="convertWebp" class="accent-primary-600 w-4 h-4"><span><i class="fa-solid fa-file-image text-purple-500 mr-1"></i> WebP</span></label>
+                     <!-- 压缩/WebP -->
+                    <label class="flex items-center gap-2 cursor-pointer bg-white dark:bg-dark-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:border-primary-400 transition" title="压缩图片 (保持原格式)"><input type="checkbox" x-model="compress" class="accent-primary-600 w-4 h-4"><span><i class="fa-solid fa-compress text-primary-500 mr-1"></i> 压缩图片</span></label>
+                    <label class="flex items-center gap-2 cursor-pointer bg-white dark:bg-dark-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:border-primary-400 transition" title="转换为 WebP 格式 (体积更小)"><input type="checkbox" x-model="convertWebp" class="accent-primary-600 w-4 h-4"><span><i class="fa-solid fa-file-image text-purple-500 mr-1"></i> 转 WebP</span></label>
                     <div class="flex items-center gap-2 bg-white dark:bg-dark-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:border-primary-400 transition"><i class="fa-regular fa-clock text-orange-500"></i><select x-model="expireTime" class="bg-transparent outline-none cursor-pointer text-slate-600 dark:text-slate-300"><option value="0">永久保存</option><option value="1">1小时</option><option value="24">24小时</option></select></div>
                 </div>
                 <!-- 队列 -->
@@ -211,7 +212,7 @@
     <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[70] flex flex-col gap-2"><template x-for="t in toasts" :key="t.id"><div x-show="t.show" x-transition.slide.up class="px-4 py-3 rounded-lg shadow-xl text-sm font-medium flex items-center gap-2 min-w-[300px]" :class="t.type === 'error' ? 'bg-red-500 text-white' : 'bg-slate-800 text-white'"><i :class="t.type === 'error' ? 'fa-solid fa-circle-exclamation' : 'fa-solid fa-circle-check'"></i><span x-text="t.message"></span></div></template></div>
 
     <script>
-        const API_BASE = 'https://img-backend.gzy318.workers.dev'; 
+        const API_BASE = 'https://img.gzy.wang'; 
 
         function appData() {
             return {
@@ -393,3 +394,4 @@
     </script>
 </body>
 </html>
+
