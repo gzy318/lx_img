@@ -6,9 +6,10 @@
     <title>零星图床 | 极速云端存储</title>
     <link rel="icon" href="https://twbk.cn/wp-content/uploads/2025/12/tx.png" type="image/png">
     
-    <!-- 核心依赖 -->
+    <!-- 核心库 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    <!-- 功能库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.umd.js"></script>
@@ -95,9 +96,23 @@
             <div class="bg-white dark:bg-dark-800 rounded-2xl shadow-2xl w-full max-w-sm p-8 relative" @click.outside="modals.login = false"><div class="text-center"><h2 class="text-xl font-bold mb-2">站长验证</h2><input type="password" x-model="inputToken" @keyup.enter="login()" placeholder="Admin Token" class="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 outline-none focus:ring-2 focus:ring-primary-500 transition mb-4"><button @click="login()" class="w-full py-3 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold transition">验证</button></div></div>
         </div>
 
-        <!-- 批量导出 -->
+        <!-- 批量导出 (全新修复版) -->
         <div x-show="modals.batchExport" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm" x-cloak x-transition.opacity>
-            <div class="bg-white dark:bg-dark-800 rounded-2xl shadow-2xl w-full max-w-2xl p-6 relative" @click.outside="modals.batchExport = false"><div class="flex justify-between items-center mb-4"><h3 class="text-lg font-bold">批量导出 (<span x-text="selectedImages.length"></span>张)</h3><button @click="modals.batchExport = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button></div><textarea readonly class="w-full h-64 p-4 rounded-lg bg-slate-50 dark:bg-slate-700 font-mono text-xs border border-slate-200 dark:border-slate-600 outline-none resize-none" x-model="batchExportContent"></textarea><div class="mt-4 flex justify-end gap-3"><button @click="copy(batchExportContent)" class="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">复制全部</button></div></div>
+            <div class="bg-white dark:bg-dark-800 rounded-2xl shadow-2xl w-full max-w-2xl p-6 relative flex flex-col" @click.outside="modals.batchExport = false">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold">批量导出 (<span x-text="selectedImages.length"></span>张)</h3>
+                    <button @click="modals.batchExport = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <!-- 格式选择 -->
+                <div class="flex gap-2 mb-3">
+                    <button @click="batchExportFormat='url'; updateBatchContent()" :class="batchExportFormat==='url'?'bg-primary-100 text-primary-600 border-primary-500':'bg-slate-100 dark:bg-slate-700 text-slate-500'" class="px-3 py-1 rounded text-xs border font-medium transition">URL 直链</button>
+                    <button @click="batchExportFormat='md'; updateBatchContent()" :class="batchExportFormat==='md'?'bg-primary-100 text-primary-600 border-primary-500':'bg-slate-100 dark:bg-slate-700 text-slate-500'" class="px-3 py-1 rounded text-xs border font-medium transition">Markdown</button>
+                    <button @click="batchExportFormat='html'; updateBatchContent()" :class="batchExportFormat==='html'?'bg-primary-100 text-primary-600 border-primary-500':'bg-slate-100 dark:bg-slate-700 text-slate-500'" class="px-3 py-1 rounded text-xs border font-medium transition">HTML</button>
+                    <button @click="batchExportFormat='bb'; updateBatchContent()" :class="batchExportFormat==='bb'?'bg-primary-100 text-primary-600 border-primary-500':'bg-slate-100 dark:bg-slate-700 text-slate-500'" class="px-3 py-1 rounded text-xs border font-medium transition">BBCode</button>
+                </div>
+                <textarea readonly class="w-full h-64 p-4 rounded-lg bg-slate-50 dark:bg-slate-700 font-mono text-xs border border-slate-200 dark:border-slate-600 outline-none resize-none" x-model="batchExportContent"></textarea>
+                <div class="mt-4 flex justify-end gap-3"><button @click="copy(batchExportContent)" class="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium">复制全部</button></div>
+            </div>
         </div>
 
         <!-- 设置弹窗 -->
@@ -134,7 +149,7 @@
         </div>
 
         <!-- 灯箱 -->
-        <div x-show="lightbox.show" class="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center" x-cloak x-transition.opacity @click="lightbox.show = false"><button class="absolute top-5 right-5 text-white/70 hover:text-white text-3xl"><i class="fa-solid fa-xmark"></i></button><img :src="lightbox.url" class="max-w-[95vw] max-h-[95vh] rounded-lg shadow-2xl transform transition cursor-zoom-out" @click.stop></div>
+        <div x-show="lightbox.show" class="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center" x-cloak x-transition.opacity @click="lightbox.show = false"><button class="absolute top-5 right-5 text-white/70 hover:text-white text-3xl"><i class="fa-solid fa-xmark"></i></button><img :src="lightbox.url" class="max-w-[95vw] max-h-[95vh] rounded-lg shadow-2xl transform transition cursor-zoom-out" :class="imgFilter" @click.stop></div>
 
         <!-- ==================== 首页 ==================== -->
         <div x-show="!showAdmin" x-transition.opacity.duration.300ms>
@@ -146,14 +161,12 @@
                 </div>
                 <!-- 选项栏 -->
                 <div class="mt-4 flex flex-wrap justify-center gap-3 text-sm text-slate-500">
-                    <!-- 水印输入框 -->
                     <div class="flex items-center gap-2 bg-white dark:bg-dark-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:border-primary-400 transition" title="输入文字自动打水印">
                         <i class="fa-solid fa-copyright text-blue-500"></i>
                         <input type="text" x-model="watermarkText" placeholder="水印文字 (可选)" class="bg-transparent outline-none w-28 text-slate-600 dark:text-slate-300 text-xs">
                     </div>
-                    <!-- 压缩/WebP -->
-                    <label class="flex items-center gap-2 cursor-pointer bg-white dark:bg-dark-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:border-primary-400 transition" title="压缩图片 (保持原格式)"><input type="checkbox" x-model="compress" class="accent-primary-600 w-4 h-4"><span><i class="fa-solid fa-compress text-primary-500 mr-1"></i> 压缩图片</span></label>
-                    <label class="flex items-center gap-2 cursor-pointer bg-white dark:bg-dark-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:border-primary-400 transition" title="转换为 WebP 格式 (体积更小)"><input type="checkbox" x-model="convertWebp" class="accent-primary-600 w-4 h-4"><span><i class="fa-solid fa-file-image text-purple-500 mr-1"></i> 转 WebP</span></label>
+                    <label class="flex items-center gap-2 cursor-pointer bg-white dark:bg-dark-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:border-primary-400 transition" title="压缩图片"><input type="checkbox" x-model="compress" class="accent-primary-600 w-4 h-4"><span><i class="fa-solid fa-compress text-primary-500 mr-1"></i> 压缩</span></label>
+                    <label class="flex items-center gap-2 cursor-pointer bg-white dark:bg-dark-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:border-primary-400 transition" title="转 WebP"><input type="checkbox" x-model="convertWebp" class="accent-primary-600 w-4 h-4"><span><i class="fa-solid fa-file-image text-purple-500 mr-1"></i> WebP</span></label>
                     <div class="flex items-center gap-2 bg-white dark:bg-dark-800 px-4 py-2 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 hover:border-primary-400 transition"><i class="fa-regular fa-clock text-orange-500"></i><select x-model="expireTime" class="bg-transparent outline-none cursor-pointer text-slate-600 dark:text-slate-300"><option value="0">永久保存</option><option value="1">1小时</option><option value="24">24小时</option></select></div>
                 </div>
                 <!-- 队列 -->
@@ -198,7 +211,7 @@
     <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[70] flex flex-col gap-2"><template x-for="t in toasts" :key="t.id"><div x-show="t.show" x-transition.slide.up class="px-4 py-3 rounded-lg shadow-xl text-sm font-medium flex items-center gap-2 min-w-[300px]" :class="t.type === 'error' ? 'bg-red-500 text-white' : 'bg-slate-800 text-white'"><i :class="t.type === 'error' ? 'fa-solid fa-circle-exclamation' : 'fa-solid fa-circle-check'"></i><span x-text="t.message"></span></div></template></div>
 
     <script>
-        const API_BASE = 'https://img-api.gzy.wang'; 
+        const API_BASE = 'https://img-backend.gzy318.workers.dev'; 
 
         function appData() {
             return {
@@ -215,7 +228,7 @@
                 settings: { limit_count: 50, limit_size: 50, compress_limit: 2, allowed_referers: '', announcement: '', maintenance_mode: false },
                 uploadQueue: [], imageList: [], blockedIps: [], selectedImages: [], localHistory: JSON.parse(localStorage.getItem('img_history') || '[]'), activeImg: {}, batchExportContent: '', toasts: [],
                 sortCol: 'created_at', sortAsc: false,
-                imageColors: [], ocrResult: '', isOcring: false,
+                imageColors: [], ocrResult: '', isOcring: false, batchExportFormat: 'url',
 
                 init() {
                     if (this.isDark) document.documentElement.classList.add('dark');
@@ -340,7 +353,22 @@
                 get filteredImages() { if (!this.searchQuery) return this.imageList; const q = this.searchQuery.toLowerCase(); return this.imageList.filter(img => (img.filename&&img.filename.toLowerCase().includes(q)) || (img.ip&&img.ip.includes(q))); },
                 toggleAll(e) { if(e.target.checked) this.selectedImages = this.filteredImages.map(img => img.id); else this.selectedImages = []; },
                 async batchDelete() { if(this.selectedImages.length === 0) return; if(!confirm(`确定删除 ${this.selectedImages.length} 张图片?`)) return; try { const res = await fetch(`${API_BASE}/api/admin/batch_delete`, { method: 'POST', headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: this.selectedImages }) }); if(res.ok) { this.notify('批量删除成功'); this.selectedImages = []; this.fetchImages(); } } catch(e) {} },
-                openBatchExport() { const links = this.imageList.filter(img => this.selectedImages.includes(img.id)).map(img => `![${img.filename}](${img.url})`).join('\n'); this.batchExportContent = links; this.modals.batchExport = true; },
+                
+                openBatchExport() { 
+                    this.updateBatchContent(); 
+                    this.modals.batchExport = true; 
+                },
+                
+                updateBatchContent() {
+                    const format = this.batchExportFormat || 'url';
+                    const list = this.imageList.filter(img => this.selectedImages.map(String).includes(String(img.id)));
+                    
+                    if (format === 'url') this.batchExportContent = list.map(i => i.url).join('\n');
+                    else if (format === 'md') this.batchExportContent = list.map(i => `![${i.filename}](${i.url})`).join('\n');
+                    else if (format === 'html') this.batchExportContent = list.map(i => `<img src="${i.url}" alt="${i.filename}" />`).join('\n');
+                    else if (format === 'bb') this.batchExportContent = list.map(i => `[img]${i.url}[/img]`).join('\n');
+                },
+
                 async purgeExpired() { if(!confirm('确定立即清理所有已过期的图片吗？\n这将释放存储空间。')) return; try { const res = await fetch(`${API_BASE}/api/admin/purge_expired`, { method: 'POST', headers: { 'Authorization': `Bearer ${this.token}` } }); const data = await res.json(); if(res.ok) { this.notify(`成功清理 ${data.count} 张过期图片`); this.fetchImages(); } } catch(e) { this.notify('清理失败', 'error'); } },
                 async fetchBlockedIps() { try { const res = await fetch(`${API_BASE}/api/admin/blocked_ips`, { headers: { 'Authorization': `Bearer ${this.token}` } }); if(res.ok) this.blockedIps = await res.json(); } catch(e) {} },
                 async blockIP(ip) { if(!ip || !confirm(`封禁 IP: ${ip} ?`)) return; try { const res = await fetch(`${API_BASE}/api/admin/block_ip`, { method: 'POST', headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ip }) }); if(res.ok) { this.notify('IP 已封禁'); if(this.adminTab === 'ips') this.fetchBlockedIps(); } } catch(e) {} },
