@@ -207,6 +207,10 @@
                 <div x-show="adminTab === 'ips'" class="flex-1 flex flex-col"><div class="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50"><div class="flex justify-between items-center"><div class="text-sm text-slate-500">黑名单列表 (禁止上传)</div><button @click="fetchBlockedIps()" class="text-slate-400 hover:text-primary-500"><i class="fa-solid fa-rotate-right"></i></button></div></div><div class="overflow-x-auto"><table class="w-full text-left"><thead class="bg-slate-50 dark:bg-slate-700/50 text-xs uppercase text-slate-400 font-semibold"><tr><th class="px-6 py-4">IP 地址</th><th class="px-6 py-4">封禁时间</th><th class="px-6 py-4 text-right">操作</th></tr></thead><tbody class="divide-y divide-slate-100 dark:divide-slate-700"><template x-for="item in blockedIps" :key="item.ip"><tr class="hover:bg-slate-50 dark:hover:bg-slate-700/30"><td class="px-6 py-4 font-mono text-sm" x-text="item.ip"></td><td class="px-6 py-4 text-sm text-slate-500" x-text="formatDate(item.created_at)"></td><td class="px-6 py-4 text-right"><button @click="unblockIP(item.ip)" class="text-sm bg-green-50 text-green-600 px-3 py-1 rounded hover:bg-green-100 transition">解封</button></td></tr></template></tbody></table><div x-show="blockedIps.length === 0" class="text-center py-20 text-slate-400"><p>暂无封禁记录</p></div></div></div>
             </div>
         </div>
+        <!-- 页脚 ICP 备案号 -->
+    <footer class="mt-10 py-6 text-center text-xs text-slate-400 dark:text-slate-600">
+        <a href="https://icp.gov.moe/?keyword=20262778" target="_blank" class="hover:text-primary-500 transition">萌ICP备20262778号</a>
+    </footer>
     </main>
 
     <div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[70] flex flex-col gap-2"><template x-for="t in toasts" :key="t.id"><div x-show="t.show" x-transition.slide.up class="px-4 py-3 rounded-lg shadow-xl text-sm font-medium flex items-center gap-2 min-w-[300px]" :class="t.type === 'error' ? 'bg-red-500 text-white' : 'bg-slate-800 text-white'"><i :class="t.type === 'error' ? 'fa-solid fa-circle-exclamation' : 'fa-solid fa-circle-check'"></i><span x-text="t.message"></span></div></template></div>
@@ -394,6 +398,7 @@
     </script>
 </body>
 </html>
+
 
 
 
